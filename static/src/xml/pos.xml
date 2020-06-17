@@ -827,14 +827,6 @@
                                 </div>
                             </t>
                         </t>
-                        <!-- AGREGADO POR MATÍAS JORQUERA 11-05-2020-->                        
-                        <t t-if='widget.pos.config.module_account'>
-                            <t t-if='widget.pos.get_order()'>
-                                <div t-attf-class='button js_invoice #{ widget.pos.get_order().is_to_invoice() ? "highlight" : ""} '>
-                                    <i class='fa fa-file-text-o' /> Boleta
-                                </div>
-                            </t>
-                        </t>
                         <div class='button js_email'>
                             <i class='fa fa-inbox' /> Email
                         </div>

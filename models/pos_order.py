@@ -14,6 +14,9 @@ from odoo.http import request
 from odoo.osv.expression import AND
 import base64
 
+#Import de axon_dte.py
+from axon_dte import genBoleta
+
 _logger = logging.getLogger(__name__)
 
 
@@ -110,6 +113,9 @@ class PosOrder(models.Model):
         :type existing_order: pos.order.
         :returns number pos_order id
         """
+
+        _logger.info("entrando a process order") #pablo
+
         order = order['data']
         pos_session = self.env['pos.session'].browse(order['pos_session_id'])
         if pos_session.state == 'closing_control' or pos_session.state == 'closed':
@@ -128,7 +134,15 @@ class PosOrder(models.Model):
 
         if not draft:
             try:
-                pos_order.action_pos_order_paid()
+                
+                respuesta = pos_order.action_pos_order_paid()
+
+                #envío de orden a dte_axon
+                _logger.error(str(respuesta))
+
+
+                genBoleta(order, respuesta)
+
             except psycopg2.DatabaseError:
                 # do not hide transactional errors, the order(s) won't be saved!
                 raise
@@ -430,6 +444,9 @@ class PosOrder(models.Model):
         :type draft: bool.
         :Returns: list -- list of db-ids for the created and updated orders.
         """
+        _logger.info("entrando a create_from_ui") #pablo
+
+
         order_ids = []
         for order in orders:
             existing_order = False
