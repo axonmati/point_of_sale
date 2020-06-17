@@ -13,9 +13,13 @@ from odoo.exceptions import UserError
 from odoo.http import request
 from odoo.osv.expression import AND
 import base64
-
+import requests
+import json
+import logging
+import os
 #Import de axon_dte.py
-from axon_dte import genBoleta
+#from axon_dte import axon_dte
+#from axon_dte import genBoleta
 
 _logger = logging.getLogger(__name__)
 
@@ -24,6 +28,153 @@ class PosOrder(models.Model):
     _name = "pos.order"
     _description = "Point of Sale Orders"
     _order = "id desc"
+
+    def _genera_boleta(self, order):
+        _logger.error("------------------------------")
+        _logger.error(str(order))
+        _logger.error("------------------------------")
+
+        dict_boleta = {
+            "DATOSCONECT": {
+                "Usuario": "axondte",
+                "Clave": "axondte"
+            }}
+
+        strBoleta = json.dumps(dict_boleta)
+       
+        try:
+            req = requests.get('http://191.235.103.59:8888/integdte/'+strBoleta)
+            _logger.error(req.status_code)
+            _logger.error(str(req.text))
+        except Exception as err:
+            _logger.error('Error llamada API GEN DTE '+str(err))
+
+
+    def genBoleta(self, order):
+        # NombreLog = "debug"
+        # ArchLog = NombreLog+".log"
+        # fichero_log = os.path.join(ArchLog)
+        # logging.basicConfig(level=logging.DEBUG, format='%(asctime)s : %(levelname)s : %(message)s', filename=fichero_log, filemode='w', )
+        print("------------------------------")
+        print(str(order))
+        print("------------------------------")
+
+        dict_boleta = {
+            "DATOSCONECT": {
+                "Usuario": "axondte",
+                "Clave": "axondte"
+            },
+            "DATOSEMP": {
+                "Rut_emisor": "96901560-9",
+                "Tipo_doc": "39",
+                "Accion": "GENDTE"
+            },
+            "RECEPTOR": {
+                "Rut_cliente": "xxxxxxxxx-x",
+                "Nombre_cliente": "",
+                "Direccion": "",
+                "Comuna": "",
+                "Ciudad": "",
+                "Correo_enviaPDF": "  "
+            },
+            "REG001": {
+                "Campo12": "39",
+                "Campo13": "0000000000",
+                "Campo14": "2020-06-15",
+                "Campo15": "3",
+                "Campo20": "96901560-9",
+                "Campo21": "AXON SOFTWARE SPA",
+                "Campo22": "ARRIENDO Y VENTA DE SOFTWARE",
+                "Campo23": "00000000",
+                "Campo24": " ",
+                "Campo26": " ",
+                "Campo27": "66666666-6",
+                "Campo28": " ",
+                "Campo29": " ",
+                "Campo30": " ",
+                "Campo31": " ",
+                "Campo32": " ",
+                "Campo33": " ",
+                "Campo34": " ",
+                "Campo35": " ",
+                "Campo36": " ",
+                "Campo40": "0000040700",
+                "Campo41": " ",
+                "Campo42": " ",
+                "Campo43": " ",
+                "Campo44": " "
+            },
+            "REG002": [{
+                    "Campo45": "0001",
+                    "Campo46": "interna",
+                    "Campo47": "0000000000321",
+                    "Campo50": "96901560-9",
+                    "Campo51": "PROMO CEVICHE PISCO SUOR",
+                    "Campo63": "000000000001.000000",
+                    "Campo65": "0000000000012900.00",
+                    "Campo70": "000000012900"
+                },
+                {
+                    "Campo45": "0002",
+                    "Campo46": "interna",
+                    "Campo47": "0000000000005",
+                    "Campo50": "96901560-9",
+                    "Campo51": "MIX DE CEVICHES",
+                    "Campo63": "000000000001.000000",
+                    "Campo65": "0000000000014900.00",
+                    "Campo70": "000000014900"
+                },
+                {
+                    "Campo45": "0003",
+                    "Campo46": "interna",
+                    "Campo47": "0000000000006",
+                    "Campo50": "96901560-9",
+                    "Campo51": "JALEA NORTENA",
+                    "Campo63": "000000000001.000000",
+                    "Campo65": "0000000000012900.00",
+                    "Campo70": "000000012900"
+                }
+            ],
+            "REGTOTALES": {
+                "Sub_total": "0000040700",
+                "Descuento_global": "0000000000",
+                "Total": "0000040700",
+                "Total_pagos": "0000040700",
+                "Vuelto": "0000000000"
+            },
+            "REGPAGOS": [{
+                    "Nombre_mdp": "Efectivo",
+                    "Monto_pago": "0000020700"
+                },
+                {
+                    "Nombre_mdp": "Tarjeta de Debito",
+                    "Monto_pago": "0000010000"
+                },
+                {
+                    "Nombre_mdp": "Tarjeta de Credito",
+                    "Monto_pago": "0000010700"
+                }
+            ],
+            "COMENTARIO": {
+                "Comentario": "Comentario al pie de pagina"
+            }
+        }
+
+        strBoleta = json.dumps(dict_boleta)
+        print(strBoleta)
+        try:
+            req = requests.get('http://191.235.103.59:8888/integdte/'+strBoleta)
+            print(req.status_code)
+        except:
+            print('Error llamada API GEN DTE')
+
+        logging.DEBUG('voy a imprimir la orden')
+        logging.DEBUG(str(json.dumps(order)))
+        logging.DEBUG('ya imprimi la orden')
+        #logging.info(str(respuesta))
+
+
+        return req
 
     @api.model
     def _amount_line_tax(self, line, fiscal_position_id):
@@ -138,10 +289,9 @@ class PosOrder(models.Model):
                 respuesta = pos_order.action_pos_order_paid()
 
                 #envío de orden a dte_axon
-                _logger.error(str(respuesta))
-
-
-                genBoleta(order, respuesta)
+                _logger.error("Respueta axon POS " + str(respuesta))
+                self._genera_boleta(order)
+                _logger.error("resultado genboleta")
 
             except psycopg2.DatabaseError:
                 # do not hide transactional errors, the order(s) won't be saved!
