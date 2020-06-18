@@ -106,21 +106,14 @@ class PosOrder(models.Model):
         }
         """
 
-
-        dict_REG002 = {}
-        lineas = {
-            "Campo45" : "",
-            "Campo46" : "",
-            "Campo47" : "",
-            "Campo50" : "",
-            "Campo51" : "",
-            "Campo63" : "",
-            "Campo65" : "",
-            "Campo70" : ""
-        }
+        dict_REG002 = []
         count = 1
 
+        
+
         for line in order['lines']:
+            
+            _logger.info("----------INICIO FOR----------")
             item = {}
 
             item["Campo45"] = str(count) #numero linea
@@ -132,8 +125,17 @@ class PosOrder(models.Model):
             item["Campo65"] = str(line[2]['price_unit']) #precio unitario
             item["Campo70"] = str(line[2]['price_subtotal']) #precio línea
 
-            dict_REG002.update(item)
+            dict_REG002.append(item)
+
             count = count+1
+            _logger.info(str(json.dumps(item)))
+            _logger.info("----------FIN FOR----------")
+
+        _logger.info("----------RESULTADO----------")
+        
+        _logger.info(str(json.dumps(dict_REG002)))
+        
+        _logger.info("----------RESULTADO----------")
 
         dict_REGTOTALES = {
             "Sub_total": "0000040700",
@@ -172,7 +174,7 @@ class PosOrder(models.Model):
         dict_boleta_p['REGPAGOS'].update(dict_REGPAGOS)
         dict_boleta_p['COMENTARIO'].update(dict_COMENTARIO)
 
-        _logger.info("----------JSONDELMARCO----------"+str(dict_boleta_p))
+        _logger.info("----------JSONDELMARCO----------"+str(json.dumps(dict_REG002)))
 
         """
         dict_boleta = {
