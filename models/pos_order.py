@@ -31,7 +31,7 @@ class PosOrder(models.Model):
     
 
     def _genera_boleta(self, order):
-        
+        #_logger.info(str(json.dumps(order)))
         #_logger.info("\n")
         #_logger.info("--------------LINE----------------")
         #_logger.info("\n")
@@ -62,80 +62,68 @@ class PosOrder(models.Model):
             "Direccion": "",
             "Comuna": "",
             "Ciudad": "",
-            "Correo_enviaPDF": "  "
+            "Correo_enviaPDF": "pbecerra@axonsoftware.cl"
         }
 
         dict_REG001 = {
-            "Campo12": 39,
-            "Campo13": "0000000000",
-            "Campo14": "2020-06-15",
-            "Campo15": 3,
-            "Campo20": "96901560-9",
-            "Campo21": "AXON SOFTWARE SPA",
-            "Campo22": "ARRIENDO Y VENTA DE SOFTWARE",
-            "Campo23": "00000000",
-            "Campo24": " ",
-            "Campo26": " ",
-            "Campo27": "66666666-6",
-            "Campo28": " ",
-            "Campo29": " ",
-            "Campo30": " ",
-            "Campo31": " ",
-            "Campo32": " ",
-            "Campo33": " ",
-            "Campo34": " ",
-            "Campo35": " ",
-            "Campo36": " ",
-            "Campo40": "0000040700",
-            "Campo41": " ",
-            "Campo42": " ",
-            "Campo43": " ",
-            "Campo44": " "
+            "Campo12": 39, # Tipo de documento
+            "Campo13": "0000000000", # Folio del documento
+            "Campo14": "2020-06-15", #Fecha de emisión del documento
+            "Campo15": 3, # Indicador de servicio
+            "Campo20": "96901560-9", # Rut del emisor
+            "Campo21": "AXON SOFTWARE SPA", # Razón social del emisor
+            "Campo22": "ARRIENDO Y VENTA DE SOFTWARE", # Giro del emisor
+            "Campo23": "00000000", # Código sucursal SII
+            "Campo24": " ", # Dirección de origen
+            "Campo26": " ", # Ciudad de la sucursal de origen
+            "Campo27": "66666666-6", # Rut del receptor
+            "Campo28": " ", # Código interno del cliente
+            "Campo29": " ", # Nombre del receptor
+            "Campo30": " ", # Contacto del receptor
+            "Campo31": " ", # Dirección del receptor
+            "Campo32": " ", # Comuna del receptor
+            "Campo33": " ", # Ciudad del receptor
+            "Campo34": " ", # Dirección postal
+            "Campo35": " ", # Comuna postal
+            "Campo36": " ", # Ciudad postal
+            "Campo40": "0000040700", # Monto total
+            "Campo41": " ", # Monto no facturable
+            "Campo42": " ", # Total período
+            "Campo43": " ", # Saldo anterior
+            "Campo44": " " # Valor a pagar
         }
-
-        """
-        dict_REG002 = {
-            "Campo45": "0001",
-            "Campo46": "interna",
-            "Campo47": "0000000000321",
-            "Campo50": "96901560-9",
-            "Campo51": "PROMO CEVICHE PISCO SUOR",
-            "Campo63": "000000000001.000000",
-            "Campo65": "0000000000012900.00",
-            "Campo70": "000000012900"
-        }
-        """
 
         dict_REG002 = []
         count = 1
 
-        
-
+        #Se recorren las líneas de la orden que viene del POS, y se van pasando hacia un diccionario temporal
         for line in order['lines']:
-            
             _logger.info("----------INICIO FOR----------")
-            item = {}
 
+            item = {} #se vacía el diccionario temporal en cada iteración
+
+            #Se le cargan los datos al diccionario
             item["Campo45"] = str(count) #numero linea
-            item["Campo46"] = "interna"
-            item["Campo47"] = str(line[2]['product_id']) #nombre del producto
-            item["Campo50"] = str(line[2]['product_id'])
-            item["Campo51"] = str(line[2]['product_id'])
-            item["Campo63"] = str(line[2]['qty']) #cantidad
-            item["Campo65"] = str(line[2]['price_unit']) #precio unitario
-            item["Campo70"] = str(line[2]['price_subtotal']) #precio línea
+            item["Campo46"] = "interna" # Tipo de codificación utilizada
+            item["Campo47"] = str(line[2]['product_id']) # Código del producto
+            item["Campo50"] = str(line[2]['product_id']) # RUT de la empresa mandante de la boleta
+            item["Campo51"] = str(line[2]['product_id']) # Nombre del producto o servicio
+            item["Campo63"] = format((line[2]['qty']), '.6f').zfill(19) # Cantidad 000000000000.000000
+            item["Campo65"] = str(line[2]['price_unit']) # Precio unitario
+            item["Campo70"] = str(line[2]['price_subtotal']) # Valor por línea de detalle (cantidad * precio)
 
+            #se anexa el dicionario al diccionario del REG002
             dict_REG002.append(item)
 
             count = count+1
+
+            #str(order.company.company_name)
             _logger.info(str(json.dumps(item)))
             _logger.info("----------FIN FOR----------")
 
-        _logger.info("----------RESULTADO----------")
-        
+        _logger.info("----------RESULTADO REG 002----------")
         _logger.info(str(json.dumps(dict_REG002)))
-        
-        _logger.info("----------RESULTADO----------")
+        _logger.info("----------RESULTADO REG 002----------")
 
         dict_REGTOTALES = {
             "Sub_total": "0000040700",
@@ -154,7 +142,8 @@ class PosOrder(models.Model):
             "Comentario": "Comentario al pie de pagina"
         }
 
-        dict_boleta_p = {
+        #estructura del JSON API DTE
+        dict_boleta = {
             "DATOSCONECT" : {},
             "DATOSEMP" : {},
             "RECEPTOR" : {},
@@ -165,16 +154,16 @@ class PosOrder(models.Model):
             "COMENTARIO" : {}
         }
 
-        dict_boleta_p['DATOSCONECT'].update(dict_DATOSCONECT)
-        dict_boleta_p['DATOSEMP'].update(dict_DATOSEMP)
-        dict_boleta_p['RECEPTOR'].update(dict_RECEPTOR)
-        dict_boleta_p['REG001'].update(dict_REG001)
-        dict_boleta_p['REG002'].update(dict_REG002)
-        dict_boleta_p['REGTOTALES'].update(dict_REGTOTALES)
-        dict_boleta_p['REGPAGOS'].update(dict_REGPAGOS)
-        dict_boleta_p['COMENTARIO'].update(dict_COMENTARIO)
+        dict_boleta['DATOSCONECT'].update(dict_DATOSCONECT)
+        dict_boleta['DATOSEMP'].update(dict_DATOSEMP)
+        dict_boleta['RECEPTOR'].update(dict_RECEPTOR)
+        dict_boleta['REG001'].update(dict_REG001)
+        dict_boleta['REG002'].update(dict_REG002)
+        dict_boleta['REGTOTALES'].update(dict_REGTOTALES)
+        dict_boleta['REGPAGOS'].update(dict_REGPAGOS)
+        dict_boleta['COMENTARIO'].update(dict_COMENTARIO)
 
-        _logger.info("----------JSONDELMARCO----------"+str(json.dumps(dict_REG002)))
+        _logger.info("----------JSONDELMARCO----------"+str(json.dumps(dict_boleta)))
 
         """
         dict_boleta = {
@@ -184,6 +173,7 @@ class PosOrder(models.Model):
             }}
         """
 
+        """
         dict_boleta = {
             "DATOSCONECT": {
                 "Usuario": "axondte",
@@ -284,7 +274,8 @@ class PosOrder(models.Model):
                 "Comentario": "Comentario al pie de pagina"
             }
         }
-        
+        """
+
         strBoleta = json.dumps(dict_boleta)
        
         try:
