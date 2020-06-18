@@ -28,18 +28,261 @@ class PosOrder(models.Model):
     _name = "pos.order"
     _description = "Point of Sale Orders"
     _order = "id desc"
+    
 
     def _genera_boleta(self, order):
-        _logger.error("------------------------------")
-        _logger.error(str(order))
-        _logger.error("------------------------------")
+        
+        #_logger.info("\n")
+        #_logger.info("--------------LINE----------------")
+        #_logger.info("\n")
+        #_logger.info(str(order['name']))
+        #for item in order['lines']:
+            #_logger.info("\n")
+            #_logger.info(str(item))
+            #_logger.info(str(item[2]))
+            #_logger.info("\n")
+        #_logger.info("\n")
+        #_logger.info("--------------FIN-----------------")
+        #_logger.info("\n")
 
+        dict_DATOSCONECT = {
+            "Usuario": "axondte",
+            "Clave": "axondte"
+        }
+
+        dict_DATOSEMP = {
+            "Rut_emisor": "96901560-9",
+            "Tipo_doc": 39,
+            "Accion": "GENDTE"
+        }
+
+        dict_RECEPTOR = {
+            "Rut_cliente": "xxxxxxxxx-x",
+            "Nombre_cliente": "",
+            "Direccion": "",
+            "Comuna": "",
+            "Ciudad": "",
+            "Correo_enviaPDF": "  "
+        }
+
+        dict_REG001 = {
+            "Campo12": 39,
+            "Campo13": "0000000000",
+            "Campo14": "2020-06-15",
+            "Campo15": 3,
+            "Campo20": "96901560-9",
+            "Campo21": "AXON SOFTWARE SPA",
+            "Campo22": "ARRIENDO Y VENTA DE SOFTWARE",
+            "Campo23": "00000000",
+            "Campo24": " ",
+            "Campo26": " ",
+            "Campo27": "66666666-6",
+            "Campo28": " ",
+            "Campo29": " ",
+            "Campo30": " ",
+            "Campo31": " ",
+            "Campo32": " ",
+            "Campo33": " ",
+            "Campo34": " ",
+            "Campo35": " ",
+            "Campo36": " ",
+            "Campo40": "0000040700",
+            "Campo41": " ",
+            "Campo42": " ",
+            "Campo43": " ",
+            "Campo44": " "
+        }
+
+        """
+        dict_REG002 = {
+            "Campo45": "0001",
+            "Campo46": "interna",
+            "Campo47": "0000000000321",
+            "Campo50": "96901560-9",
+            "Campo51": "PROMO CEVICHE PISCO SUOR",
+            "Campo63": "000000000001.000000",
+            "Campo65": "0000000000012900.00",
+            "Campo70": "000000012900"
+        }
+        """
+
+
+        dict_REG002 = {}
+        lineas = {
+            "Campo45" : "",
+            "Campo46" : "",
+            "Campo47" : "",
+            "Campo50" : "",
+            "Campo51" : "",
+            "Campo63" : "",
+            "Campo65" : "",
+            "Campo70" : ""
+        }
+        count = 1
+
+        for line in order['lines']:
+            item = {}
+
+            item["Campo45"] = str(count) #numero linea
+            item["Campo46"] = "interna"
+            item["Campo47"] = str(line[2]['product_id']) #nombre del producto
+            item["Campo50"] = str(line[2]['product_id'])
+            item["Campo51"] = str(line[2]['product_id'])
+            item["Campo63"] = str(line[2]['qty']) #cantidad
+            item["Campo65"] = str(line[2]['price_unit']) #precio unitario
+            item["Campo70"] = str(line[2]['price_subtotal']) #precio línea
+
+            dict_REG002.update(item)
+            count = count+1
+
+        dict_REGTOTALES = {
+            "Sub_total": "0000040700",
+            "Descuento_global": "0000000000",
+            "Total": "0000040700",
+            "Total_pagos": "0000040700",
+            "Vuelto": "0000000000"
+        }
+
+        dict_REGPAGOS = {
+            "Nombre_mdp": "Efectivo",
+            "Monto_pago": "0000020700"
+        }
+
+        dict_COMENTARIO = {
+            "Comentario": "Comentario al pie de pagina"
+        }
+
+        dict_boleta_p = {
+            "DATOSCONECT" : {},
+            "DATOSEMP" : {},
+            "RECEPTOR" : {},
+            "REG001" : {},
+            "REG002" : {},
+            "REGTOTALES" : {},
+            "REGPAGOS" : {},
+            "COMENTARIO" : {}
+        }
+
+        dict_boleta_p['DATOSCONECT'].update(dict_DATOSCONECT)
+        dict_boleta_p['DATOSEMP'].update(dict_DATOSEMP)
+        dict_boleta_p['RECEPTOR'].update(dict_RECEPTOR)
+        dict_boleta_p['REG001'].update(dict_REG001)
+        dict_boleta_p['REG002'].update(dict_REG002)
+        dict_boleta_p['REGTOTALES'].update(dict_REGTOTALES)
+        dict_boleta_p['REGPAGOS'].update(dict_REGPAGOS)
+        dict_boleta_p['COMENTARIO'].update(dict_COMENTARIO)
+
+        _logger.info("----------JSONDELMARCO----------"+str(dict_boleta_p))
+
+        """
         dict_boleta = {
             "DATOSCONECT": {
                 "Usuario": "axondte",
                 "Clave": "axondte"
             }}
+        """
 
+        dict_boleta = {
+            "DATOSCONECT": {
+                "Usuario": "axondte",
+                "Clave": "axondte"
+            },
+            "DATOSEMP": {
+                "Rut_emisor": "96901560-9",
+                "Tipo_doc": 39,
+                "Accion": "GENDTE"
+            },
+            "RECEPTOR": {
+                "Rut_cliente": "xxxxxxxxx-x",
+                "Nombre_cliente": "",
+                "Direccion": "",
+                "Comuna": "",
+                "Ciudad": "",
+                "Correo_enviaPDF": "  "
+            },
+            "REG001": {
+                "Campo12": 39,
+                "Campo13": "0000000000",
+                "Campo14": "2020-06-15",
+                "Campo15": 3,
+                "Campo20": "96901560-9",
+                "Campo21": "AXON SOFTWARE SPA",
+                "Campo22": "ARRIENDO Y VENTA DE SOFTWARE",
+                "Campo23": "00000000",
+                "Campo24": " ",
+                "Campo26": " ",
+                "Campo27": "66666666-6",
+                "Campo28": " ",
+                "Campo29": " ",
+                "Campo30": " ",
+                "Campo31": " ",
+                "Campo32": " ",
+                "Campo33": " ",
+                "Campo34": " ",
+                "Campo35": " ",
+                "Campo36": " ",
+                "Campo40": "0000040700",
+                "Campo41": " ",
+                "Campo42": " ",
+                "Campo43": " ",
+                "Campo44": " "
+            },
+            "REG002": [{
+                    "Campo45": "0001",
+                    "Campo46": "interna",
+                    "Campo47": "0000000000321",
+                    "Campo50": "96901560-9",
+                    "Campo51": "PROMO CEVICHE PISCO SUOR",
+                    "Campo63": "000000000001.000000",
+                    "Campo65": "0000000000012900.00",
+                    "Campo70": "000000012900"
+                },
+                {
+                    "Campo45": "0002",
+                    "Campo46": "interna",
+                    "Campo47": "0000000000005",
+                    "Campo50": "96901560-9",
+                    "Campo51": "MIX DE CEVICHES",
+                    "Campo63": "000000000001.000000",
+                    "Campo65": "0000000000014900.00",
+                    "Campo70": "000000014900"
+                },
+                {
+                    "Campo45": "0003",
+                    "Campo46": "interna",
+                    "Campo47": "0000000000006",
+                    "Campo50": "96901560-9",
+                    "Campo51": "JALEA NORTEÑA",
+                    "Campo63": "000000000001.000000",
+                    "Campo65": "0000000000012900.00",
+                    "Campo70": "000000012900"
+                }
+            ],
+            "REGTOTALES": {
+                "Sub_total": "0000040700",
+                "Descuento_global": "0000000000",
+                "Total": "0000040700",
+                "Total_pagos": "0000040700",
+                "Vuelto": "0000000000"
+            },
+            "REGPAGOS": [{
+                    "Nombre_mdp": "Efectivo",
+                    "Monto_pago": "0000020700"
+                },
+                {
+                    "Nombre_mdp": "Tarjeta de Debito",
+                    "Monto_pago": "0000010000"
+                },
+                {
+                    "Nombre_mdp": "Tarjeta de Credito",
+                    "Monto_pago": "0000010700"
+                }
+            ],
+            "COMENTARIO": {
+                "Comentario": "Comentario al pie de pagina"
+            }
+        }
+        
         strBoleta = json.dumps(dict_boleta)
        
         try:
@@ -265,8 +508,6 @@ class PosOrder(models.Model):
         :returns number pos_order id
         """
 
-        _logger.info("entrando a process order") #pablo
-
         order = order['data']
         pos_session = self.env['pos.session'].browse(order['pos_session_id'])
         if pos_session.state == 'closing_control' or pos_session.state == 'closed':
@@ -289,9 +530,13 @@ class PosOrder(models.Model):
                 respuesta = pos_order.action_pos_order_paid()
 
                 #envío de orden a dte_axon
-                _logger.error("Respueta axon POS " + str(respuesta))
+                _logger.error('\n')
+                _logger.error("Llamando a _genera_boleta " + str(respuesta))
+                _logger.error('\n')
                 self._genera_boleta(order)
-                _logger.error("resultado genboleta")
+                _logger.error('\n')
+                _logger.error("Finalizando _genera_boleta")
+                _logger.error('\n')
 
             except psycopg2.DatabaseError:
                 # do not hide transactional errors, the order(s) won't be saved!
@@ -594,8 +839,6 @@ class PosOrder(models.Model):
         :type draft: bool.
         :Returns: list -- list of db-ids for the created and updated orders.
         """
-        _logger.info("entrando a create_from_ui") #pablo
-
 
         order_ids = []
         for order in orders:
