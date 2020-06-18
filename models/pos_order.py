@@ -105,11 +105,11 @@ class PosOrder(models.Model):
             #Se le cargan los datos al diccionario
             item["Campo45"] = str(count) #numero linea
             item["Campo46"] = "interna" # Tipo de codificación utilizada
-            item["Campo47"] = str(line[2]['product_id']) # Código del producto
+            item["Campo47"] = str(line[2]['product_id']).zfill(13) # Código del producto 0000000000000 (13)
             item["Campo50"] = str(line[2]['product_id']) # RUT de la empresa mandante de la boleta
             item["Campo51"] = str(line[2]['product_id']) # Nombre del producto o servicio
-            item["Campo63"] = format((line[2]['qty']), '.6f').zfill(19) # Cantidad 000000000000.000000
-            item["Campo65"] = str(line[2]['price_unit']) # Precio unitario
+            item["Campo63"] = format((line[2]['qty']), '.6f').zfill(12+1+6) # Cantidad 000000000000.000000 
+            item["Campo65"] = format((line[2]['price_unit']), '.2f').zfill(16+1+2)) # Precio unitario 000000000000.00
             item["Campo70"] = str(line[2]['price_subtotal']) # Valor por línea de detalle (cantidad * precio)
 
             #se anexa el dicionario al diccionario del REG002
