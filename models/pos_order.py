@@ -28,10 +28,11 @@ class PosOrder(models.Model):
     _name = "pos.order"
     _description = "Point of Sale Orders"
     _order = "id desc"
-    
 
     def _genera_boleta(self, order):
-        #_logger.info(str(json.dumps(order)))
+        #Imprime la orden completa
+        _logger.info(str(json.dumps(order)))
+
         #_logger.info("\n")
         #_logger.info("--------------LINE----------------")
         #_logger.info("\n")
@@ -98,10 +99,9 @@ class PosOrder(models.Model):
 
         #Se recorren las líneas de la orden que viene del POS, y se van pasando hacia un diccionario temporal
         for line in order['lines']:
-            _logger.info('----------INICIO FOR----------')
+            #_logger.info('----------INICIO FOR----------')
 
             prdResult = self.env['product.product'].search([("id", "=", line[2]['product_id'])],limit=1)
-
             prdName = prdResult.name
             prdDefCode = prdResult.default_code
 
@@ -111,6 +111,7 @@ class PosOrder(models.Model):
             item = {} #se vacía el diccionario temporal en cada iteración
 
             #Se le cargan los datos al diccionario
+            #CON FORMATEO DE DATOS
             item['Campo45'] = str(count).zfill(4) #numero linea
             item['Campo46'] = 'interna' # Tipo de codificación utilizada
             item['Campo47'] = str(prdDefCode).zfill(13) # Código del producto 0000000000000 (13)
@@ -119,6 +120,16 @@ class PosOrder(models.Model):
             item['Campo63'] = format((line[2]['qty']), '.6f').zfill(12+1+6) #### Cantidad 000000000000.000000 
             item['Campo65'] = format((line[2]['price_unit']), '.2f').zfill(16+1+2) # Precio unitario 000000000000.00
             item['Campo70'] = str(line[2]['price_subtotal']).zfill(12) # Valor por línea de detalle (cantidad * precio)
+            
+            #SIN FORMATEO DE DATOS
+            # item['Campo45'] = str(count) #numero linea
+            # item['Campo46'] = 'interna' # Tipo de codificación utilizada
+            # item['Campo47'] = str(prdDefCode) # Código del producto
+            # item['Campo50'] = '96901560-9' # RUT de la empresa mandante de la boleta
+            # item['Campo51'] = str(prdName) # Nombre del producto o servicio
+            # item['Campo63'] = str(line[2]['qty']) # Cantidad
+            # item['Campo65'] = str(line[2]['price_unit']) # Precio unitario 
+            # item['Campo70'] = str(line[2]['price_subtotal']) # Valor por línea de detalle (cantidad * precio)
 
             #se anexa el dicionario item al diccionario dict_REG002
             dict_REG002.append(item)
@@ -126,31 +137,46 @@ class PosOrder(models.Model):
             count = count+1
 
             #str(order.company.company_name)
-            _logger.info(str(json.dumps(item)))
-            _logger.info('----------FIN FOR----------')
+            #_logger.info(str(json.dumps(item)))
+            #_logger.info('----------FIN FOR----------')
 
-        _logger.info('----------RESULTADO REG 002----------')
-        _logger.info(str(json.dumps(dict_REG002)))
-        _logger.info('----------RESULTADO REG 002----------')
+        #_logger.info('----------RESULTADO REG 002----------')
+        #_logger.info(str(json.dumps(dict_REG002)))
+        #_logger.info('----------RESULTADO REG 002----------')
 
         #en la orden no viene el descuento global, habrá que crearlo a futuro ###PABLO###
-        order['descuento_global'] = 0
+        order['_descuento_global'] = 0
         
         dict_REGTOTALES = {
             "Sub_total": str(order['amount_total']).zfill(10),
-            "Descuento_global": order['descuento_global'],
-            "Total": order['amount_total'] - order['descuento_global'], 
+            "Descuento_global": order['_descuento_global'],
+            "Total": order['amount_total'] - order['_descuento_global'], 
             "Total_pagos": order['amount_paid'],
             "Vuelto": order['amount_return']
         }
 
-        dict_REGPAGOS = {
-            "Nombre_mdp": "Efectivo",
-            "Monto_pago": "0000020700"
-        }
+        dict_REGPAGOS = []
+
+        for pago in order['statement_ids']:
+            
+            pagoResult = self.env['pos.payment.method'].search([("id", "=", pago[2]['payment_method_id'])],limit=1)
+            pagoName = pagoResult.name
+
+            item = {} #se vacía el diccionario temporal en cada iteración
+
+            #Se le cargan los datos al diccionario
+            item['Nombre_mdp'] = pagoName # Nombre del medio de pago
+            item['Monto_pago'] = pago[2]['amount'] # Monto pagado
+
+            #se anexa el dicionario item al diccionario dict_REG002
+            dict_REGPAGOS.append(item)
+
+        #_logger.info('----------RESULTADO REG PAGOS----------')
+        #_logger.info(str(json.dumps(dict_REGPAGOS)))
+        #_logger.info('----------RESULTADO REG PAGOS----------')
 
         dict_COMENTARIO = {
-            "Comentario": "Comentario al pie de pagina"
+            "Comentario": "GRACIAS POR SU COMPRA"
         }
 
         #estructura del JSON API DTE
@@ -159,9 +185,9 @@ class PosOrder(models.Model):
             "DATOSEMP" : {},
             "RECEPTOR" : {},
             "REG001" : {},
-            "REG002" : {},
+            "REG002" : [],
             "REGTOTALES" : {},
-            "REGPAGOS" : {},
+            "REGPAGOS" : [],
             "COMENTARIO" : {}
         }
 
@@ -169,24 +195,48 @@ class PosOrder(models.Model):
         dict_boleta["DATOSEMP"].update(dict_DATOSEMP)
         dict_boleta["RECEPTOR"].update(dict_RECEPTOR)
         dict_boleta["REG001"].update(dict_REG001)
-        dict_boleta["REG002"].update(dict_REG002)
+        dict_boleta["REG002"] = (dict_REG002)
         dict_boleta["REGTOTALES"].update(dict_REGTOTALES)
-        dict_boleta["REGPAGOS"].update(dict_REGPAGOS)
+        dict_boleta["REGPAGOS"] = (dict_REGPAGOS)
         dict_boleta["COMENTARIO"].update(dict_COMENTARIO)
 
-        _logger.info("----------JSONDELMARCO----------"+str(json.dumps(dict_boleta)))
+        _logger.info("----------JSON API DTE----------"+str(json.dumps(dict_boleta)))
 
         strBoleta = json.dumps(dict_boleta)
        
         try:
-            req = requests.get("http://191.235.103.59:8888/integdte/"+strBoleta)
-            _logger.error(req.status_code)
-            _logger.error(str(req.text))
+            response = requests.get("http://191.235.103.59:8888/integdte/"+strBoleta)
+            _logger.error(str(response.status_code))
+            _logger.error(str(response.text))
+            _logger.error("response: "+str(response))
         except Exception as err:
-            _logger.error("Error llamada API GEN DTE "+str(err))
+            _logger.error("Error en llamada a API DTE: "+str(err))
+        
+        response_obj = json.loads(response.text)
 
+        dte_folio = response_obj['RespuestaDTE']['Folio']
+        dte_ruta_pdf = response_obj['RespuestaDTE']['ArchPDF']
+        dte_comentario = response_obj['RespuestaDTE']['ProcesoDTE'] #Anteriormente response_obj['RespuestaDTE']['Comentario']. Marco le cambió el nombre.
 
-    
+        _logger.info("RESPUESTA FOLIO: "+str(dte_folio))
+        _logger.info("RESPUESTA RUTA PDF: "+str(dte_ruta_pdf))
+        _logger.info("RESPUESTA COMENTARIO: "+str(dte_comentario))
+
+        if order['to_invoice'] is True:
+            dte_codigo = "33" #factura electrónica
+        else:
+            dte_codigo = "39" #boleta electrónica
+
+        #Obtiene el id del tipo del DTE generado
+        qry_dte_codigo = self.env['l10n_latam.document.type'].search([("code", "=", dte_codigo)],limit=1)
+        id_tipo_dte = qry_dte_codigo.id
+
+        #Se agrega el folio a la orden
+        order['x_folio_dte'] = int(dte_folio)
+        order['x_codigo_dte'] = int(dte_codigo)
+        order['x_id_tipo_dte'] = int(id_tipo_dte)
+
+        return order
 
     @api.model
     def _amount_line_tax(self, line, fiscal_position_id):
@@ -214,6 +264,9 @@ class PosOrder(models.Model):
             'amount_total':  ui_order['amount_total'],
             'amount_tax':  ui_order['amount_tax'],
             'amount_return':  ui_order['amount_return'],
+            'x_folio_dte': ui_order['x_folio_dte'], #Folio DTE en Axon DTE. PABLO.
+            'x_codigo_dte': ui_order['x_codigo_dte'], #Tipo de DTE en Axon DTE. PABLO.
+            'x_id_tipo_dte': ui_order['x_id_tipo_dte'], #ID del Tipo de DTE en Axon DTE. PABLO.
             'company_id': self.env['pos.session'].browse(ui_order['pos_session_id']).company_id.id,
             'to_invoice': ui_order['to_invoice'] if "to_invoice" in ui_order else False,
         }
@@ -282,31 +335,36 @@ class PosOrder(models.Model):
         if pos_session.state == 'closing_control' or pos_session.state == 'closed':
             order['pos_session_id'] = self._get_valid_session(order).id
 
+
+        try:
+            #envío de orden a API DTE
+            _logger.error('Llamando a _genera_boleta ')
+            order = self._genera_boleta(order) #Procesa la orden en el DTE y retorna la orden modificada con algunas propiedades adicionales (x_axon_dte_folio)
+            _logger.error('Finalizando _genera_boleta')
+        except Exception as e:
+            _logger.error('Could not fully process the POS Order: ERROR AL LLAMAR _genera_boleta(): %s', tools.ustr(e))
+
+
         pos_order = False
         if not existing_order:
             pos_order = self.create(self._order_fields(order))
+
+            _logger.error('\n')
+
         else:
             pos_order = existing_order
             pos_order.lines.unlink()
             order['user_id'] = pos_order.user_id.id
-            pos_order.write(self._order_fields(order))
+            pos_order.write(self._order_fields(order)) #acá sobreescribe la orden si ya existe
 
         self._process_payment_lines(order, pos_order, pos_session, draft)
 
         if not draft:
             try:
                 
-                respuesta = pos_order.action_pos_order_paid()
+                pos_order.action_pos_order_paid()
 
-                #envío de orden a dte_axon
-                _logger.error('\n')
-                _logger.error("Llamando a _genera_boleta " + str(respuesta))
-                _logger.error('\n')
-                self._genera_boleta(order)
-                _logger.error('\n')
-                _logger.error("Finalizando _genera_boleta")
-                _logger.error('\n')
-
+                #Acá se llamaba a _genera_boleta anteriormente (Alejandro lo había puesto aquí)
             except psycopg2.DatabaseError:
                 # do not hide transactional errors, the order(s) won't be saved!
                 raise
@@ -317,7 +375,6 @@ class PosOrder(models.Model):
             pos_order.action_pos_order_invoice()
 
         return pos_order.id
-
 
     def _process_payment_lines(self, pos_order, order, pos_session, draft):
         """Create account.bank.statement.lines from the dictionary given to the parent function.
