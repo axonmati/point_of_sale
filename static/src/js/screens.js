@@ -1804,6 +1804,7 @@ var ReceiptScreenWidget = ScreenWidget.extend({
     },
     render_receipt: function() {
         this.$('.pos-receipt-container').html(QWeb.render('OrderReceipt', this.get_receipt_render_env()));
+        //this.$('.pos-receipt-container').html("<embed src='http://mwtest.axonsoftware.cl/dte/969015609/39_0000000001.pdf' width='600' height='500' alt='pdf' pluginspage='http://www.adobe.com/products/acrobat/readstep2.html'></embed>");
     },
 });
 gui.define_screen({name:'receipt', widget: ReceiptScreenWidget});

@@ -992,7 +992,8 @@ exports.PosModel = Backbone.Model.extend({
             })];
         args.push(options.draft || false);
 
-        console.log('a punto de llamar a la API');
+        console.log('a punto de llamar a la API DEL MARCO');
+        //AXON PABLO
         return rpc.query({
                 model: 'pos.order',
                 method: 'create_from_ui',

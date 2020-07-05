@@ -15,6 +15,7 @@ class Axon:
         logging.debug("------------------------------")
         logging.debug(str(order))
 
+
         dict_boleta = {
             "DATOSCONECT": {
                 "Usuario": "axondte",

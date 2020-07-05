@@ -7,6 +7,7 @@ from functools import partial
 import psycopg2
 import pytz
 
+
 from odoo import api, fields, models, tools, _
 from odoo.tools import float_is_zero
 from odoo.exceptions import UserError
@@ -20,6 +21,7 @@ import os
 #Import de axon_dte.py
 #from axon_dte import axon_dte
 #from axon_dte import genBoleta
+from datetime import datetime #importada para inyectar fecha en el JSON de _genera_boleta(self, order)
 
 _logger = logging.getLogger(__name__)
 
@@ -46,52 +48,106 @@ class PosOrder(models.Model):
         #_logger.info("--------------FIN-----------------")
         #_logger.info("\n")
 
+        #Obtención de datos para dict_DATOSEMP
+        qry_cajero = self.env['hr.employee'].search([("id", "=", order['employee_id'] )],limit=1)
+        nombre_cajero = qry_cajero.name
+
+        qry_pos_session = self.env['pos.session'].search([("id", "=", order['pos_session_id'] )],limit=1)
+        pos_config_id_obj = qry_pos_session.config_id
+        pos_config_id = pos_config_id_obj.id
+
+        qry_pos_config = self.env['pos.config'].search([("id", "=", pos_config_id)],limit=1)
+        pos_name = qry_pos_config.name
+
+        company_id_obj = qry_pos_config.company_id
+        company_id = company_id_obj.id
+
+        qry_company = self.env['res.company'].search([("id", "=", company_id)],limit=1)
+        rut_empresa = qry_company.x_rut_empresa
+
+        #Datos del receptor ('partner' para odoo).
+        if order['partner_id']:
+            qry_partner = self.env['res.partner'].search([("id", "=", order['partner_id'])],limit=1)
+            str_rut = str(qry_partner.vat) #Este es el RUT del cliente
+            
+            if str_rut is 'False':
+                partner_vat = "66666666-6"
+            else:
+                rut = str_rut[:-1]
+                dv = str_rut[-1]
+                partner_vat = rut+"-"+dv
+
+            partner_name = qry_partner.name
+            partner_address = qry_partner.street
+            partner_city = qry_partner.city
+            partner_email = qry_partner.email
+        else:
+            partner_vat = "66666666-6"
+            partner_name = ""
+            partner_address = ""
+            partner_city = ""
+            partner_email = ""
+
+        if order['to_invoice'] is True:
+            dte_codigo = "33" #factura electrónica
+        else:
+            dte_codigo = "39" #boleta electrónica
+            qry_partner = self.env['res.partner'].search([("vat", "=", "66666666-6")],limit=1) #obtenemos el RUT 66.666.666-6 (Consumidor Final Anónimo)
+            order['partner_id'] = qry_partner.id
+
+        order['to_invoice'] = True; # Finalmente lo setea en True para que incluso las boletas no marcadas como Factura se muestren en "Facturando".
+
         dict_DATOSCONECT = {
             "Usuario": "axondte",
-            "Clave": "axondte"
+            "Clave": "axondte",
+            "Direccion_ip": "192.168.0.23",
+            "Tipo_formato": "8cm",
+            "Imprimir": "SI"
         }
 
         dict_DATOSEMP = {
-            "Rut_emisor": "96901560-9",
-            "Tipo_doc": 39,
-            "Accion": "GENDTE"
+            "Rut_emisor": rut_empresa,
+            "Tipo_doc": int(dte_codigo),
+            "Accion": "GENDTE",
+            "Cajero": nombre_cajero,
+            "Caja": pos_name
         }
 
         dict_RECEPTOR = {
-            "Rut_cliente": "xxxxxxxxx-x",
-            "Nombre_cliente": "",
-            "Direccion": "",
-            "Comuna": "",
-            "Ciudad": "",
-            "Correo_enviaPDF": "pbecerra@axonsoftware.cl"
+            "Rut_cliente": partner_vat, #xxxxxxxxx-x
+            "Nombre_cliente": partner_name,
+            "Direccion": partner_address,
+            "Comuna": partner_city, #Se le pasa la ciudad, ya que Odoo no maneja comuna en modelo res.partner, y tampoco es necesario agregar el campo.
+            "Ciudad": partner_city,
+            "Correo_enviaPDF": partner_email
         }
 
         dict_REG001 = {
-            "Campo12": 39, # Tipo de documento
+            "Campo12": int(dte_codigo), # Tipo de documento
             "Campo13": "0000000000", # Folio del documento
-            "Campo14": "2020-06-15", #Fecha de emisión del documento
+            "Campo14": datetime.today().strftime('%Y-%m-%d'), #Fecha de emisión del documento
             "Campo15": 3, # Indicador de servicio
-            "Campo20": "96901560-9", # Rut del emisor
-            "Campo21": "AXON SOFTWARE SPA", # Razón social del emisor
-            "Campo22": "ARRIENDO Y VENTA DE SOFTWARE", # Giro del emisor
-            "Campo23": "00000000", # Código sucursal SII
-            "Campo24": " ", # Dirección de origen
-            "Campo26": " ", # Ciudad de la sucursal de origen
-            "Campo27": "66666666-6", # Rut del receptor
-            "Campo28": " ", # Código interno del cliente
-            "Campo29": " ", # Nombre del receptor
-            "Campo30": " ", # Contacto del receptor
-            "Campo31": " ", # Dirección del receptor
-            "Campo32": " ", # Comuna del receptor
-            "Campo33": " ", # Ciudad del receptor
-            "Campo34": " ", # Dirección postal
-            "Campo35": " ", # Comuna postal
-            "Campo36": " ", # Ciudad postal
-            "Campo40": "0000040700", # Monto total
-            "Campo41": " ", # Monto no facturable
-            "Campo42": " ", # Total período
-            "Campo43": " ", # Saldo anterior
-            "Campo44": " " # Valor a pagar
+            "Campo20": rut_empresa, # Rut del emisor
+            "Campo21": "", # Razón social del emisor
+            "Campo22": "", # Giro del emisor
+            "Campo23": "", # Código sucursal SII
+            "Campo24": "", # Dirección de origen
+            "Campo26": "", # Ciudad de la sucursal de origen
+            "Campo27": partner_vat, # Rut del receptor
+            "Campo28": "", # Código interno del cliente
+            "Campo29": partner_name, # Nombre del receptor
+            "Campo30": "", # Contacto del receptor
+            "Campo31": "", # Dirección del receptor
+            "Campo32": partner_city, # Comuna del receptor
+            "Campo33": partner_city, # Ciudad del receptor
+            "Campo34": "", # Dirección postal
+            "Campo35": "", # Comuna postal
+            "Campo36": "", # Ciudad postal
+            "Campo40": str(order['amount_total']).zfill(10), # Monto total
+            "Campo41": "", # Monto no facturable
+            "Campo42": "", # Total período
+            "Campo43": "", # Saldo anterior
+            "Campo44": "" # Valor a pagar
         }
 
         dict_REG002 = []
@@ -115,7 +171,7 @@ class PosOrder(models.Model):
             item['Campo45'] = str(count).zfill(4) #numero linea
             item['Campo46'] = 'interna' # Tipo de codificación utilizada
             item['Campo47'] = str(prdDefCode).zfill(13) # Código del producto 0000000000000 (13)
-            item['Campo50'] = '96901560-9' # RUT de la empresa mandante de la boleta
+            item['Campo50'] = rut_empresa # RUT de la empresa mandante de la boleta
             item['Campo51'] = str(prdName) #### Nombre del producto o servicio 
             item['Campo63'] = format((line[2]['qty']), '.6f').zfill(12+1+6) #### Cantidad 000000000000.000000 
             item['Campo65'] = format((line[2]['price_unit']), '.2f').zfill(16+1+2) # Precio unitario 000000000000.00
@@ -149,10 +205,10 @@ class PosOrder(models.Model):
         
         dict_REGTOTALES = {
             "Sub_total": str(order['amount_total']).zfill(10),
-            "Descuento_global": order['_descuento_global'],
-            "Total": order['amount_total'] - order['_descuento_global'], 
-            "Total_pagos": order['amount_paid'],
-            "Vuelto": order['amount_return']
+            "Descuento_global": str(order['_descuento_global']).zfill(10),
+            "Total": str(order['amount_total'] - order['_descuento_global']).zfill(10), 
+            "Total_pagos": str(order['amount_paid']).zfill(10),
+            "Vuelto": str(order['amount_return']).zfill(10)
         }
 
         dict_REGPAGOS = []
@@ -166,7 +222,7 @@ class PosOrder(models.Model):
 
             #Se le cargan los datos al diccionario
             item['Nombre_mdp'] = pagoName # Nombre del medio de pago
-            item['Monto_pago'] = pago[2]['amount'] # Monto pagado
+            item['Monto_pago'] = str(pago[2]['amount']).zfill(10) # Monto pagado
 
             #se anexa el dicionario item al diccionario dict_REG002
             dict_REGPAGOS.append(item)
@@ -204,37 +260,42 @@ class PosOrder(models.Model):
 
         strBoleta = json.dumps(dict_boleta)
        
+        #Anteriormente se llamaba a la API desde acá
+
+        #Obtiene el id del tipo del DTE generado
+        qry_dte_codigo = self.env['l10n_latam.document.type'].search([("code", "=", dte_codigo)],limit=1)
+        dte_tipo_id = qry_dte_codigo.id
+
+        #Se agrega el folio a la orden
+        order['x_folio_dte'] = 0 #Se setea el folio en cero, en caso de que la API DTE no responda, la orden queda guardada igual en el backend. (?)
+        order['x_codigo_dte'] = int(dte_codigo)
+        order['x_id_tipo_dte'] = int(dte_tipo_id)
+        order['x_url_pdf_dte'] = "NO GENERADO (ERR LLAMADA API)" #Se setea la URL como NO GENERADO, en caso de que la API DTE no responda, la orden queda guardada igual en el backend (?)
+
         try:
-            response = requests.get("http://191.235.103.59:8888/integdte/"+strBoleta)
-            _logger.error(str(response.status_code))
-            _logger.error(str(response.text))
-            _logger.error("response: "+str(response))
+            response = requests.get("http://191.235.103.59:8888/genera_dte/"+strBoleta)
+            _logger.error("STATUS: "+str(response.status_code))
+            _logger.error("TEXTO: "+str(response.text))
+            #_logger.error("response: "+str(response))
         except Exception as err:
             _logger.error("Error en llamada a API DTE: "+str(err))
         
         response_obj = json.loads(response.text)
 
         dte_folio = response_obj['RespuestaDTE']['Folio']
-        dte_ruta_pdf = response_obj['RespuestaDTE']['ArchPDF']
-        dte_comentario = response_obj['RespuestaDTE']['ProcesoDTE'] #Anteriormente response_obj['RespuestaDTE']['Comentario']. Marco le cambió el nombre.
+        dte_url_pdf = response_obj['RespuestaDTE']['ArchPDF']
+        dte_resultado = response_obj['RespuestaDTE']['ProcesoDTE'] #Anteriormente response_obj['RespuestaDTE']['Comentario']. Marco le cambió el nombre.
 
         _logger.info("RESPUESTA FOLIO: "+str(dte_folio))
-        _logger.info("RESPUESTA RUTA PDF: "+str(dte_ruta_pdf))
-        _logger.info("RESPUESTA COMENTARIO: "+str(dte_comentario))
+        _logger.info("RESPUESTA RUTA PDF: "+str(dte_url_pdf))
+        _logger.info("RESPUESTA RESULTADO OPERACIÓN: "+str(dte_resultado))
 
-        if order['to_invoice'] is True:
-            dte_codigo = "33" #factura electrónica
-        else:
-            dte_codigo = "39" #boleta electrónica
-
-        #Obtiene el id del tipo del DTE generado
-        qry_dte_codigo = self.env['l10n_latam.document.type'].search([("code", "=", dte_codigo)],limit=1)
-        id_tipo_dte = qry_dte_codigo.id
-
-        #Se agrega el folio a la orden
+        #Se sobreescribe el folio y ruta del PDF en la orden, en caso de que la llamada a la API DTE se haya ejecutado exitosamente.
         order['x_folio_dte'] = int(dte_folio)
-        order['x_codigo_dte'] = int(dte_codigo)
-        order['x_id_tipo_dte'] = int(id_tipo_dte)
+        if dte_folio is 0:
+            order['x_url_pdf_dte'] = "NO GENERADO (ERR API)"
+        else:
+            order['x_url_pdf_dte'] = dte_url_pdf
 
         return order
 
@@ -264,9 +325,10 @@ class PosOrder(models.Model):
             'amount_total':  ui_order['amount_total'],
             'amount_tax':  ui_order['amount_tax'],
             'amount_return':  ui_order['amount_return'],
-            'x_folio_dte': ui_order['x_folio_dte'], #Folio DTE en Axon DTE. PABLO.
-            'x_codigo_dte': ui_order['x_codigo_dte'], #Tipo de DTE en Axon DTE. PABLO.
-            'x_id_tipo_dte': ui_order['x_id_tipo_dte'], #ID del Tipo de DTE en Axon DTE. PABLO.
+            'x_folio_dte': ui_order['x_folio_dte'], #Folio DTE en Axon DTE. PABLO @ AXON.
+            'x_codigo_dte': ui_order['x_codigo_dte'], #Tipo de DTE en Axon DTE. PABLO @ AXON.
+            'x_id_tipo_dte': ui_order['x_id_tipo_dte'], #ID del Tipo de DTE en Axon DTE. PABLO @ AXON.
+            'x_url_pdf_dte': ui_order['x_url_pdf_dte'], #URL del PDF del DTE en Axon DTE. PABLO @ AXON.
             'company_id': self.env['pos.session'].browse(ui_order['pos_session_id']).company_id.id,
             'to_invoice': ui_order['to_invoice'] if "to_invoice" in ui_order else False,
         }
@@ -335,7 +397,6 @@ class PosOrder(models.Model):
         if pos_session.state == 'closing_control' or pos_session.state == 'closed':
             order['pos_session_id'] = self._get_valid_session(order).id
 
-
         try:
             #envío de orden a API DTE
             _logger.error('Llamando a _genera_boleta ')
@@ -343,7 +404,6 @@ class PosOrder(models.Model):
             _logger.error('Finalizando _genera_boleta')
         except Exception as e:
             _logger.error('Could not fully process the POS Order: ERROR AL LLAMAR _genera_boleta(): %s', tools.ustr(e))
-
 
         pos_order = False
         if not existing_order:
@@ -674,7 +734,14 @@ class PosOrder(models.Model):
             if (existing_order and existing_order.state == 'draft') or not existing_order:
                 order_ids.append(self._process_order(order, draft, existing_order))
 
-        return self.env['pos.order'].search_read(domain = [('id', 'in', order_ids)], fields = ['id', 'pos_reference'])
+        #Agregué la siguiente línea para ver qué retorna este metodo a la GUI WEB. PABLO @ AXON.
+        #_logger.info(str(self.env['pos.order'].search_read(domain = [('id', 'in', order_ids)], fields = ['id', 'pos_reference'])))
+
+        #Línea original
+        #return self.env['pos.order'].search_read(domain = [('id', 'in', order_ids)], fields = ['id', 'pos_reference'])
+
+        #Línea modificada por PABLO @ AXON.
+        return self.env['pos.order'].search_read(domain = [('id', 'in', order_ids)], fields = ['id', 'pos_reference', 'x_url_pdf_dte'])
 
     def create_picking(self):
         """Create a picking for each order and validate it."""
